@@ -13,7 +13,7 @@
 // Order Is Important!
 // #include "configurations.hpp"
 // #include "files.hpp"
-// #include "http.hpp"
+#include "HTTP.hpp"
 
 //////////////// Mess
 ////// Server Computer's Infos
@@ -172,9 +172,9 @@ namespace woXrooX{
 
       }while(true);
 
-      Http::handle(inData);
+      HTTP::handle(inData);
 
-      Log::custom("<", Http::getRequestFirsLine());
+      Log::custom("<", HTTP::getRequestFirsLine());
 
     }
 
@@ -182,12 +182,12 @@ namespace woXrooX{
       // Check if new_socket_tcp established successfully
       if(Server::new_socket_tcp == -1) return;
 
-      Server::outData = Http::getResponse();
+      Server::outData = HTTP::getResponse();
       Server::bytes_sent = send(Server::new_socket_tcp, Server::outData.c_str(), Server::outData.size(), 0);
       if(Server::bytes_sent == -1){Log::error("Failed to send data."); return;}
       // else Log::success("Data Sent Successfully");
 
-      Log::custom(">", Http::getResponseFirstLine());
+      Log::custom(">", HTTP::getResponseFirstLine());
     }
 
 
