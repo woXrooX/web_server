@@ -11,7 +11,7 @@
 #include "includes/logger/source/logger.hpp"
 
 // Order Is Important!
-// #include "configurations.hpp"
+#include "configurations.hpp"
 // #include "files.hpp"
 #include "HTTP.hpp"
 
