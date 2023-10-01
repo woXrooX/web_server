@@ -10,10 +10,8 @@
 
 #include "includes/logger/source/logger.hpp"
 
-// Order Is Important!
-#include "configurations.hpp"
-// #include "files.hpp"
-#include "HTTP.hpp"
+//////////////// Function types
+typedef const std::string& (*handle_request_pFunc_t)(const std::string&);
 
 //////////////// Mess
 ////// Server Computer's Infos
@@ -24,239 +22,238 @@ struct sockaddr_storage client_address;
 socklen_t client_address_size = sizeof client_address;
 
 namespace woXrooX{
-  class Server final{
-  public:
-    static void start(){
-      Server::server_computer_infos_init();
-      Server::create_socket_tcp();
-      Server::make_address_reusalbe();
-      Server::keep_alive();
-      Server::create_bind();
-      Server::create_listen();
-      Server::on = true;
-      Server::create_new_socket_tcp();
-    }
+	class Server final{
+	public:
+	static void init(
+		const std::string& (*handle_request_func)(const std::string&),
+		const std::string& IP = "127.0.0.1",
+		const std::string& PORT = "8000"
+	){
+		Server::handle_request_func = handle_request_func;
+		Server::IP = IP;
+		Server::PORT = PORT;
 
-    static void stop(){
-      // Check If Server Is Running
-      if(Server::on == false) return;
+		Server::server_computer_infos_init();
+		Server::create_socket_tcp();
+		Server::make_address_reusalbe();
+		Server::keep_alive();
+		Server::create_bind();
+		Server::create_listen();
+		Server::on = true;
+		Server::create_new_socket_tcp();
+	}
 
-      Server::on = false;
-      Server::close_new_socket_tcp();
-      Server::shutdown_socket_tcp();
-      Server::close_socket_tcp();
-    }
+	static void stop(){
+		// Check If Server Is Running
+		if(Server::on == false) return;
 
-  private:
-    static void server_computer_infos_init(){
-      memset(&hints, 0, sizeof hints);      // Zeroing hints before using
+		Server::on = false;
+		Server::close_new_socket_tcp();
+		Server::shutdown_socket_tcp();
+		Server::close_socket_tcp();
+	}
 
-      hints.ai_family = AF_UNSPEC;          // don't care IPv4 or IPv6
-      hints.ai_socktype = SOCK_STREAM;      // TCP stream sockets
-      hints.ai_flags = AI_PASSIVE;          // fill in my computer's IP for me
+	private:
+	static void server_computer_infos_init(){
+		memset(&hints, 0, sizeof hints);      // Zeroing hints before using
 
-      Server::get_addr_info = getaddrinfo(Server::IP.c_str(), Server::PORT.c_str(), &hints, &result);
+		hints.ai_family = AF_UNSPEC;          // don't care IPv4 or IPv6
+		hints.ai_socktype = SOCK_STREAM;      // TCP stream sockets
+		hints.ai_flags = AI_PASSIVE;          // fill in my computer's IP for me
 
-      if(Server::get_addr_info != 0) Log::error("Error In Establishing Server Computer Informations");
-      else Log::success("Server Computer Informations Established Successfully");
+		Server::get_addr_info = getaddrinfo(Server::IP.c_str(), Server::PORT.c_str(), &hints, &result);
 
-    }
-
-
-    static void create_socket_tcp(){
-      // Check If Server Computer Informations Established Successfully
-      if(Server::get_addr_info != 0) return;
-
-      Server::socket_tcp = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-      if(Server::socket_tcp == -1) Log::error("Failed To Create Socket Descriptor.");
-      else Log::success("Socket Descriptor Created Successfully");
-
-    }
+		if(Server::get_addr_info != 0) Log::error("Error In Establishing Server Computer Informations");
+		else Log::success("Server Computer Informations Established Successfully");
+	}
 
 
-    static void make_address_reusalbe(){
-      // Check If Socket TCP Created Successfully
-      if(Server::socket_tcp == -1) return;
+	static void create_socket_tcp(){
+		// Check If Server Computer Informations Established Successfully
+		if(Server::get_addr_info != 0) return;
 
-      // For Development!
-      // Below Code Allows Rebind To Address While The Address Is In Use.
-      // w/o This Function It Fails To Bind To The Address After Terminating The Server.
-      // OS Keeps Socket Open For A While So Binding Is Imposible!
-      // Disable This Function On Production.
-      // Enable/Disable At woXrooX::Server::start::make_address_reusalbe();
-      const int REUSE_MODE = 1;
-      if(setsockopt(Server::socket_tcp, SOL_SOCKET, SO_REUSEADDR, &REUSE_MODE, sizeof(REUSE_MODE)) == -1) Log::error("Failed to enable address reuse mode.");
-      else{
-        Log::custom("DEV", "Address reuseable mode is enabled successfully.");
-        Log::warning("On production disable address reuseable mode at 'woXrooX::Server::start()::make_address_reusalbe();'");
-      }
-    }
+		Server::socket_tcp = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+		if(Server::socket_tcp == -1) Log::error("Failed To Create Socket Descriptor.");
+		else Log::success("Socket Descriptor Created Successfully");
 
-    static void keep_alive(){
-      // Check If Socket TCP Created Successfully
-      if(Server::socket_tcp == -1) return;
-
-      const int KEEP_ALIVE = 1;
-      if(setsockopt(Server::socket_tcp, SOL_SOCKET, SO_KEEPALIVE, &KEEP_ALIVE, sizeof(KEEP_ALIVE)) == -1) Log::error("Failed to enable 'Keep Alive'.");
-      else Log::success("'Keep Alive' enabled successfully.");
-    }
+	}
 
 
-    static void create_bind(){
-      // Check If Socket TCP Created Successfully
-      if(Server::socket_tcp == -1) return;
+	static void make_address_reusalbe(){
+		// Check If Socket TCP Created Successfully
+		if(Server::socket_tcp == -1) return;
 
-      Server::binding = bind(Server::socket_tcp, result->ai_addr, result->ai_addrlen);
-      if(Server::binding == -1) Log::error("Failed to bind.");
-      else Log::success("Bound successfully.");
-    }
+		// For Development!
+		// Below Code Allows Rebind To Address While The Address Is In Use.
+		// w/o This Function It Fails To Bind To The Address After Terminating The Server.
+		// OS Keeps Socket Open For A While So Binding Is Imposible!
+		// Disable This Function On Production.
+		// Enable/Disable At woXrooX::Server::start::make_address_reusalbe();
+		const int REUSE_MODE = 1;
+		if(setsockopt(Server::socket_tcp, SOL_SOCKET, SO_REUSEADDR, &REUSE_MODE, sizeof(REUSE_MODE)) == -1) Log::error("Failed to enable address reuse mode.");
+		else{
+			Log::custom("DEV", "Address reuseable mode is enabled successfully.");
+			Log::warning("On production disable address reuseable mode at 'woXrooX::Server::start()::make_address_reusalbe();'");
+		}
+	}
+	static void keep_alive(){
+		// Check If Socket TCP Created Successfully
+		if(Server::socket_tcp == -1) return;
 
-    static void create_listen(){
-      // Check If Bound Successfully
-      if(Server::binding == -1) return;
-
-      Server::listening = listen(Server::socket_tcp, Server::BACKLOG);
-      if(Server::listening == -1) Log::error("Failed to listen.");
-      else{
-        Log::success("Listening successfully on: http://"+Server::IP+":"+Server::PORT);
-        Log::line();
-      }
-    }
+		const int KEEP_ALIVE = 1;
+		if(setsockopt(Server::socket_tcp, SOL_SOCKET, SO_KEEPALIVE, &KEEP_ALIVE, sizeof(KEEP_ALIVE)) == -1) Log::error("Failed to enable 'Keep Alive'.");
+		else Log::success("'Keep Alive' enabled successfully.");
+	}
 
 
-    static void create_new_socket_tcp(){
-      // Check if listening successfully
-      if(Server::listening == -1) return;
+	static void create_bind(){
+		// Check If Socket TCP Created Successfully
+		if(Server::socket_tcp == -1) return;
 
-      while((Server::new_socket_tcp = accept(Server::socket_tcp, (struct sockaddr *)&client_address, &client_address_size)) >= 0){
-        Log::line();
-        Log::success("New connection accepted successfully.");
+		Server::binding = bind(Server::socket_tcp, result->ai_addr, result->ai_addrlen);
+		if(Server::binding == -1) Log::error("Failed to bind.");
+		else Log::success("Bound successfully.");
+	}
+	static void create_listen(){
+		// Check If Bound Successfully
+		if(Server::binding == -1) return;
 
-        // Log Client IP Address
-        char client_address_printable[46]; // 46 is max IPv6 size
-        inet_ntop(AF_INET, &client_address, client_address_printable, sizeof client_address_printable);
-        Log::custom("Client IP address", client_address_printable);
+		Server::listening = listen(Server::socket_tcp, Server::BACKLOG);
+		if(Server::listening == -1) Log::error("Failed to listen.");
+		else{
+			Log::success("Listening successfully on: http://"+Server::IP+":"+Server::PORT);
+			Log::line();
+		}
+	}
 
-        // Receive data
-        Server::in();
 
-        // Send data
-        Server::out();
+	static void create_new_socket_tcp(){
+		// Check if listening successfully
+		if(Server::listening == -1) return;
 
-        Server::close_new_socket_tcp();
+		while((Server::new_socket_tcp = accept(Server::socket_tcp, (struct sockaddr *)&client_address, &client_address_size)) >= 0){
+			Log::line();
+			Log::success("New connection accepted successfully.");
 
-      }
+			// Log Client IP Address
+			char client_address_printable[46]; // 46 is max IPv6 size
+			inet_ntop(AF_INET, &client_address, client_address_printable, sizeof client_address_printable);
+			Log::custom("Client IP address", client_address_printable);
 
-      if(Server::new_socket_tcp == -1) Log::error("Failed to accept.");
+			// Receive data
+			Server::request();
 
-    }
+			// Send data
+			Server::response();
 
-    static void in(){
-      // bytes_received -1 on error
-      // bytes_received 0 on end of the line
-      // bytes_received > 0 on data
+			Server::close_new_socket_tcp();
+		}
 
-      // Check if new_socket_tcp established successfully
-      if(Server::new_socket_tcp == -1) return;
+		if(Server::new_socket_tcp == -1) Log::error("Failed to accept.");
 
-      char inData[Server::BUFFER];
-      int received_data_size = 0;
-      do{
-        Server::bytes_received = recv(Server::new_socket_tcp, inData, Server::BUFFER, 0);
-        received_data_size += Server::bytes_received;
+	}
 
-        if(received_data_size > Server::BUFFER-1 || inData[Server::BUFFER-1] == '\n') break;
-        if(Server::bytes_received == -1){Log::error("Failed to receive data."); return;}
-        if(Server::bytes_received == 0){Log::info("End of the line."); break;}
-        if(Server::bytes_received > 0){Log::success("Data received successfully."); break;}
+	static void request(){
+		// bytes_received -1 on error
+		// bytes_received 0 on end of the line
+		// bytes_received > 0 on data
 
-      }while(true);
+		// Check if new_socket_tcp established successfully
+		if(Server::new_socket_tcp == -1) return;
 
-      HTTP::handle(inData);
+		char RAW_IN[Server::BUFFER];
+		int received_data_size = 0;
+		do{
+			Server::bytes_received = recv(Server::new_socket_tcp, RAW_IN, Server::BUFFER, 0);
+			received_data_size += Server::bytes_received;
 
-      Log::custom("<", HTTP::getRequestFirsLine());
+			if(received_data_size > Server::BUFFER-1 || RAW_IN[Server::BUFFER-1] == '\n') break;
+			if(Server::bytes_received == -1){Log::error("Failed to receive data."); return;}
+			if(Server::bytes_received == 0){Log::info("End of the line."); break;}
+			if(Server::bytes_received > 0){Log::success("Data received successfully."); break;}
+		}while(true);
 
-    }
+		Server::RAW_IN = RAW_IN;
+	}
+	static void response(){
+		// Check if new_socket_tcp established successfully
+		if(Server::new_socket_tcp == -1) return;
 
-    static void out(){
-      // Check if new_socket_tcp established successfully
-      if(Server::new_socket_tcp == -1) return;
-
-      Server::outData = HTTP::getResponse();
-      Server::bytes_sent = send(Server::new_socket_tcp, Server::outData.c_str(), Server::outData.size(), 0);
-      if(Server::bytes_sent == -1){Log::error("Failed to send data."); return;}
-      // else Log::success("Data Sent Successfully");
-
-      Log::custom(">", HTTP::getResponseFirstLine());
-    }
+		Server::RAW_OUT = Server::handle_request_func(Server::RAW_IN);
+		Server::bytes_sent = send(Server::new_socket_tcp, Server::RAW_OUT.c_str(), Server::RAW_OUT.size(), 0);
+		if(Server::bytes_sent == -1){Log::error("Failed to send data."); return;}
+		else Log::success("Data Sent Successfully");
+	}
 
 
 
-    static void close_new_socket_tcp(){
-      // Check if new_socket_tcp established successfully
-      if(Server::new_socket_tcp == -1) return;
+	static void close_new_socket_tcp(){
+		// Check if new_socket_tcp established successfully
+		if(Server::new_socket_tcp == -1) return;
 
-      if(close(Server::new_socket_tcp) == -1) Log::error("Failed to close new socket TCP.");
-      else Log::success("New socket TCP closed successfully.");
-    }
+		if(close(Server::new_socket_tcp) == -1) Log::error("Failed to close new socket TCP.");
+		else Log::success("New socket TCP closed successfully.");
+	}
+	static void shutdown_socket_tcp(){
+		// Check if socket_tcp established successfully
+		if(Server::socket_tcp == -1) return;
 
-    static void shutdown_socket_tcp(){
-      // Check if socket_tcp established successfully
-      if(Server::socket_tcp == -1) return;
+		if(shutdown(Server::socket_tcp, SHUT_RDWR) != 0) Log::error("Failed to shutdown socket TCP.");
+		else Log::success("Socket TCP shutdown successfully.");
+	}
+	static void close_socket_tcp(){
+		// Check if socket_tcp established successfully
+		if(Server::socket_tcp == -1) return;
 
-      if(shutdown(Server::socket_tcp, SHUT_RDWR) != 0) Log::error("Failed to shutdown socket TCP.");
-      else Log::success("Socket TCP shutdown successfully.");
-    }
+		if(close(Server::socket_tcp) == -1) Log::error("Failed to close socket TCP.");
+		else Log::success("Socket TCP closed successfully.");
+	}
 
-    static void close_socket_tcp(){
-      // Check if socket_tcp established successfully
-      if(Server::socket_tcp == -1) return;
+	/////////// External functions to be used on handling request and responses
+	static handle_request_pFunc_t handle_request_func;
 
-      if(close(Server::socket_tcp) == -1) Log::error("Failed to close socket TCP.");
-      else Log::success("Socket TCP closed successfully.");
-    }
+	/////////// Variables
+	static bool on;
 
+	static std::string RAW_OUT;
+	static std::string RAW_IN;
 
-    /////////// Variables
-    static bool on;
+	static int bytes_sent;
+	static int bytes_received;
+	static int BACKLOG;
+	static int BUFFER;
 
-    static std::string outData;
-    // static std::string inData; Not Used For Now
+	// Socket SetUp
+	static int get_addr_info;
+	static int socket_tcp;
+	static int binding;
+	static int listening;
+	static int new_socket_tcp;
 
-    static int bytes_sent;
-    static int bytes_received;
-    static int BACKLOG;
-    static int BUFFER;
+	static std::string IP;
+	static std::string PORT;
+	};
 
-    // Socket SetUp
-    static int get_addr_info;
-    static int socket_tcp;
-    static int binding;
-    static int listening;
-    static int new_socket_tcp;
+	handle_request_pFunc_t Server::handle_request_func;
 
-    static std::string IP;
-    static std::string PORT;
-  };
+	bool Server::on = false;
 
-  bool Server::on = false;
+	std::string Server::RAW_OUT;
+	std::string Server::RAW_IN;
 
-  std::string Server::outData;
+	int Server::bytes_sent = 0;
+	int Server::bytes_received = 0;
+	int Server::BACKLOG = 1024;
+	int Server::BUFFER = 131072;
 
-  int Server::bytes_sent = 0;
-  int Server::bytes_received = 0;
-  int Server::BACKLOG = 1024;
-  int Server::BUFFER = 131072;
+	int Server::get_addr_info = 0;
+	int Server::socket_tcp = -1;
+	int Server::binding = -1;
+	int Server::listening = -1;
+	int Server::new_socket_tcp = -1;
 
-  int Server::get_addr_info = 0;
-  int Server::socket_tcp = -1;
-  int Server::binding = -1;
-  int Server::listening = -1;
-  int Server::new_socket_tcp = -1;
-
-  std::string Server::IP = "127.0.0.1";
-  std::string Server::PORT = "8080";
-
+	std::string Server::IP = "127.0.0.1";
+	std::string Server::PORT = "8000";
 }
 
 #endif
